@@ -40,35 +40,20 @@ let getNextMonster () =
     monsters[nextIndex]
 
 type AdventurerAction =
-    | Attack
+    | Attack of damageMultiplier: double
     | Defend
-    | Dodge
+    | Dodge of dodgeSuccessful: bool
     | Heal
 
 type MonsterAction =
-    | Attack
+    | Attack of damageMultiplier: double
     | Defend
 
-let monsterActions: MonsterAction array = [| Attack; Defend |]
 let getNextMonsterAction () =
-    monsterActions[Random.Shared.Next(0, monsterActions.Length)]
-
-type DiceRoll = {
-    MonsterDamageMultiplier: double
-    MonsterAction: MonsterAction
-
-    AdventurerDamageMultiplier: double
-    AdventurerDodgeSuccessful: bool
-}
-
-let getNextDiceRoll () =
-    {
-        MonsterDamageMultiplier = Random.Shared.NextDouble() * 1.5 + 0.5
-        MonsterAction = getNextMonsterAction()
-
-        AdventurerDamageMultiplier = Random.Shared.NextDouble() * 1.5 + 0.5
-        AdventurerDodgeSuccessful = Random.Shared.NextDouble() < 0.6
-    }
+    match Random.Shared.Next(0, 2) with
+    | 0 -> MonsterAction.Attack (Random.Shared.NextDouble() * 1.5 + 0.5)
+    | 1 -> MonsterAction.Defend
+    | _ -> failwith "Невалидное случайное значение"
 
 let calculateDamage strength defense defendsSelf damageMultiplier =
     let damageMultiplierBase = if defendsSelf then 0.5 else 1
@@ -76,33 +61,33 @@ let calculateDamage strength defense defendsSelf damageMultiplier =
     let damage = (int (float strength * damageMultiplierTotal) - defense)
     damage
 
-let handleAdventurerAttack (adventurer: Adventurer) (monster: Monster) monsterDefends (diceRoll: DiceRoll) =
-    let damage = calculateDamage adventurer.Strength monster.Defense monsterDefends diceRoll.AdventurerDamageMultiplier
+let handleAdventurerAttack (adventurer: Adventurer) (monster: Monster) monsterDefends adventurerDamageMultiplier =
+    let damage = calculateDamage adventurer.Strength monster.Defense monsterDefends adventurerDamageMultiplier
     let monster = { monster with Health = monster.Health - damage }
     printfn $"{adventurer.GloriousName} нанес {damage} урона. У врага осталось {monster.Health} ед. здоровья."
     monster
 
-let handleMonsterAttack (monster: Monster) (adventurer: Adventurer) adventurerDefends (diceRoll: DiceRoll) =
-    let damage = calculateDamage monster.Strength adventurer.Defense adventurerDefends diceRoll.MonsterDamageMultiplier
+let handleMonsterAttack (monster: Monster) (adventurer: Adventurer) adventurerDefends monsterDamageMultiplier =
+    let damage = calculateDamage monster.Strength adventurer.Defense adventurerDefends monsterDamageMultiplier
     let adventurer = { adventurer with Health = adventurer.Health - damage }
     printfn $"{getMonsterTypeName monster.Type} атакует! Он нанес {damage} урона, у тебя осталось {adventurer.Health} ед. здоровья."
     adventurer
 
-let handleFightTurn adventurer monster monsterDefends adventurerAction diceRoll =
+let handleFightTurn adventurer monster monsterDefends adventurerAction monsterAction =
     let monster =
         match adventurerAction with
-        | AdventurerAction.Attack ->
-            handleAdventurerAttack adventurer monster monsterDefends diceRoll
+        | AdventurerAction.Attack damageMultiplier ->
+            handleAdventurerAttack adventurer monster monsterDefends damageMultiplier
         | AdventurerAction.Defend ->
             monster
-        | AdventurerAction.Dodge -> failwith "Not implemented!"
+        | AdventurerAction.Dodge dodgeSuccessful -> failwith "Not implemented!"
         | AdventurerAction.Heal -> failwith "Not implemented!"
 
     let adventurerDefends = adventurerAction = AdventurerAction.Defend
 
-    match diceRoll.MonsterAction with
-    | MonsterAction.Attack ->
-        let adventurer = handleMonsterAttack monster adventurer adventurerDefends diceRoll
+    match monsterAction with
+    | MonsterAction.Attack damageMultiplier ->
+        let adventurer = handleMonsterAttack monster adventurer adventurerDefends damageMultiplier
         adventurer, monster, false
     | MonsterAction.Defend ->
         printfn $"{getMonsterTypeName monster.Type} защищается."
@@ -126,9 +111,9 @@ let rec fightMonster (adventurer: Adventurer) (monster: Monster) monsterDefends 
 
     let adventurerAction =
         match input.Key with
-        | ConsoleKey.A -> Some AdventurerAction.Attack
+        | ConsoleKey.A -> Some (AdventurerAction.Attack (Random.Shared.NextDouble() * 1.5 + 0.5))
         | ConsoleKey.D -> Some AdventurerAction.Defend
-        | ConsoleKey.F -> Some AdventurerAction.Dodge
+        | ConsoleKey.F -> Some (AdventurerAction.Dodge (Random.Shared.NextDouble() < 0.6))
         | ConsoleKey.S -> Some AdventurerAction.Heal
         | _ ->
            printfn "Неизвестное действие. Попробуй снова."
@@ -138,8 +123,9 @@ let rec fightMonster (adventurer: Adventurer) (monster: Monster) monsterDefends 
     | None ->
         fightMonster adventurer monster monsterDefends
     | Some adventurerAction ->
-        let diceRoll = getNextDiceRoll ()
-        let adventurer, monster, monsterDefends = handleFightTurn adventurer monster monsterDefends adventurerAction diceRoll
+        let monsterAction = getNextMonsterAction ()
+        let adventurer, monster, monsterDefends =
+            handleFightTurn adventurer monster monsterDefends adventurerAction monsterAction
         fightMonster adventurer monster monsterDefends
 
 let runGameLoop adventurer =
