@@ -31,7 +31,7 @@ type Adventurer = {
 
 let monsters: Monster list = [
     { Type = Slime; Health = 10; Strength = 2; Defense = 2 }
-    { Type = Zombie; Health = 20; Strength = 3; Defense = 5 }
+    { Type = Zombie; Health = 20; Strength = 3; Defense = 3 }
     { Type = Phantom; Health = 15; Strength = 5; Defense = 1 }
 ]
 
