@@ -29,11 +29,11 @@ type Adventurer = {
     HealingPotionStrength: int
 }
 
-let monsters: Monster list = [
+let monsters: Monster array = [|
     { Type = Slime; Health = 10; Strength = 2; Defense = 2 }
     { Type = Zombie; Health = 20; Strength = 3; Defense = 3 }
     { Type = Phantom; Health = 15; Strength = 5; Defense = 1 }
-]
+|]
 
 let getNextMonster () =
     let nextIndex = Random.Shared.Next(0, monsters.Length)
