@@ -59,6 +59,7 @@ type BattleContext = {
 
     Adventurer: Adventurer
     AdventurerBlocks: bool
+    AdventurerDodged: bool
     Monster: Monster
     MonsterBlocks: bool
 
@@ -75,6 +76,7 @@ module BattleContext =
             Status = Playing
             Adventurer = adventurer
             AdventurerBlocks = false
+            AdventurerDodged = false
             Monster = monster
             MonsterBlocks = false
             AdventurerAttackFactor = 1
@@ -148,25 +150,40 @@ let handleAdventurerAction state adventurerAction monster monsterBlocks =
             printfn $"{adventurer.GloriousName} защищается."
             { state with AdventurerBlocks = true }
         | AdventurerAction.Dodge ->
-            failwith "Not implemented"
+            printfn $"{adventurer.GloriousName} будет уклоняться"
+            { state with AdventurerDodged = state.AdventurerDodgeSuccessful }
         | Heal ->
-            failwith "Not implemented"
+            printfn $"{adventurer.GloriousName} лечится."
+            let health = state.Adventurer.Health + state.Adventurer.HealingPotionStrength
+            let potionsLeft = state.Adventurer.HealingPotionCount - 1
+            printfn $"Здоровье {adventurer.GloriousName} - {health} ед. Осталось {potionsLeft} зелий"
+            { state with Adventurer = { state.Adventurer with Health = health; HealingPotionCount = potionsLeft } }
 
 let handleMonsterAction state (monster: Monster) monsterAction =
-    printfn $"{getMonsterTypeName monster.Type} атакует!"
+    match monsterAction with
+    | MonsterAction.Attack ->
+        printfn $"{getMonsterTypeName monster.Type} атакует!"
+        let adventurer = state.Adventurer
+        if state.AdventurerDodgeSuccessful then
+            printfn $"{adventurer.GloriousName} успешно уклоняется"
+            state
+        else
 
-    let adventurer = state.Adventurer
-    let adventurerDamage =
-        calculateDamage monster.Strength adventurer.Defense state.AdventurerBlocks state.MonsterAttackFactor
+        printfn $"{adventurer.GloriousName} не смог уклониться"
+        let adventurerDamage =
+            calculateDamage monster.Strength adventurer.Defense state.AdventurerBlocks state.MonsterAttackFactor
 
-    let adventurerHealth = adventurer.Health - adventurerDamage
-    if adventurerHealth <= 0 then
-        printfn $"{getMonsterTypeName monster.Type} наносит критический удар {adventurerDamage} ед. урона и побеждает {adventurer.GloriousName}."
-        { state with Status = GameOver }
-    else
-        printfn $"{getMonsterTypeName monster.Type} наносит {adventurerDamage} ед. урона {adventurer.GloriousName}."
-        printfn $"У {adventurer.GloriousName} осталось {adventurerHealth} ед. здоровья."
-        { state with Adventurer = { adventurer with Health = adventurerHealth } }
+        let adventurerHealth = adventurer.Health - adventurerDamage
+        if adventurerHealth <= 0 then
+            printfn $"{getMonsterTypeName monster.Type} наносит критический удар {adventurerDamage} ед. урона и побеждает {adventurer.GloriousName}."
+            { state with Status = GameOver }
+        else
+            printfn $"{getMonsterTypeName monster.Type} наносит {adventurerDamage} ед. урона {adventurer.GloriousName}."
+            printfn $"У {adventurer.GloriousName} осталось {adventurerHealth} ед. здоровья."
+            { state with Adventurer = { adventurer with Health = adventurerHealth } }
+    | MonsterAction.Block ->
+        printfn $"{getMonsterTypeName monster.Type} защищается."
+        { state with MonsterBlocks = true }
 
 let processFrame state adventurerAction =
     let monster = state.Monster
@@ -174,6 +191,9 @@ let processFrame state adventurerAction =
 
     let state = handleAdventurerAction state adventurerAction monster monsterBlocks
 
+    if state.Monster.Health < 0 then
+        { state with Status = GameStatus.Won }
+    else
     let monsterAction = state.MonsterActionDecider state
     let state = handleMonsterAction state monster monsterAction
 
@@ -186,7 +206,7 @@ let gameLoop adventurer =
 
         if state.Status = GameOver then
             printfn "Проиграл."
-        else
+        elif state.Status = Won then
             if state.Monster.Health <= 0 then
                 let monster = getNextMonster ()
                 printMonsterIntroduction state.Adventurer monster

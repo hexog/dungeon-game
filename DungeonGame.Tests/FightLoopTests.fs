@@ -19,17 +19,7 @@ let zombieMonster: Monster = {
     Defense = 2
 }
 
-let state = {
-    Status = Playing
-    Adventurer = adventurer
-    AdventurerBlocks = false
-    Monster = zombieMonster
-    MonsterBlocks = false
-    AdventurerAttackFactor = 1
-    AdventurerDodgeSuccessful = false
-    MonsterAttackFactor = 1
-    MonsterActionDecider = fun _ -> MonsterAction.Attack
-}
+let state = BattleContext.create adventurer zombieMonster
 
 [<Test>]
 let ``Test attack`` () =
@@ -75,7 +65,7 @@ let ``Test dodge fail`` () =
 
 [<Test>]
 let ``Test heal`` () =
-    let state = processFrame state AdventurerAction.Heal
+    let state = processFrame { state with MonsterActionDecider = fun _ -> MonsterAction.Block } AdventurerAction.Heal
 
     Assert.That(state.Adventurer.Health, Is.EqualTo(adventurer.Health + adventurer.HealingPotionStrength))
     Assert.That(state.Adventurer.HealingPotionCount, Is.EqualTo(adventurer.HealingPotionCount - 1))
@@ -86,3 +76,8 @@ let ``Test fight ends when monster dies`` () =
     let state = processFrame { state with Monster = monster } AdventurerAction.Attack
 
     Assert.That(state.Status, Is.EqualTo(GameStatus.Won))
+
+[<Test>]
+let ``Test monster defencs`` () =
+    let state = processFrame { state with MonsterActionDecider = fun _ -> MonsterAction.Block } AdventurerAction.Attack
+    Assert.That(state.MonsterBlocks, Is.True)
